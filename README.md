@@ -60,7 +60,7 @@ Also you will need to know a little bit about “Action Message Format” (AMF).
 * [http://en.wikipedia.org/wiki/Action_Message_Format](http://en.wikipedia.org/wiki/Action_Message_Format)
 
 ## Expanding on this
-My needs were specific, but the code can be adapted very easily to handle any of the other functions that you see in closed source projects such as (FLVMDI)[http://www.buraks.com/flvmdi/]
+My needs were specific, but the code can be adapted very easily to handle any of the other functions that you see in closed source projects such as [FLVMDI](http://www.buraks.com/flvmdi/)
 
 ## Ideas, Questions, Comments?
 Just message me and I will try to help.
