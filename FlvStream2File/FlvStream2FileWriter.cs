@@ -7,7 +7,7 @@ using System.Diagnostics;
 
 namespace FlvStream2File
 {
-    public class FlvStream2FileWriter
+    public class FlvStream2FileWriter : IDisposable
     {
         private FileStream _fs = null;
         public string FileName { get; private set; }
@@ -27,14 +27,53 @@ namespace FlvStream2File
         private Tag _curTag = new Tag();
 
         internal byte[] _prevSize = new byte[sizeof(int)];
-       
-        // TODO: IDisposable...
+
+        
 
         public FlvStream2FileWriter(string filename)
         {
             this.FileName = filename;
             this.MaxTimeStamp = int.MinValue;
         }
+
+        #region IDisposeable
+        // Dispose() calls Dispose(true)
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        ~FlvStream2FileWriter() 
+        {
+            // Finalizer calls Dispose(false)
+            Dispose(false);
+        }
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // free managed resources
+                if (_fs != null)
+                {
+                    _fs.Dispose();
+                    _fs = null;
+                }
+                if (_ms != null)
+                {
+                    _ms.Dispose();
+                    _ms = null;
+                }
+            }
+            // free native resources if there are any.
+            //if (nativeResource != IntPtr.Zero)
+            //{
+            //    Marshal.FreeHGlobal(nativeResource);
+            //    nativeResource = IntPtr.Zero;
+            //}
+        }
+
+        #endregion
+
 
         public int Write(byte[] buffer)
         {
