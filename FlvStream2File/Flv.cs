@@ -39,8 +39,8 @@ namespace FlvStream2File
             Array.Reverse(timMsBigEn);
             Buffer.BlockCopy(timMsBigEn, 0, tag, 8, 3); // size (3 bytes) = 8
             
-            tag[10] = TimeExtra; // tm extra (1 bytes) = 12
-            Buffer.BlockCopy(StreamId, 0, tag, 11, 3); // tm (3 bytes) = 15    
+            tag[11] = TimeExtra; // tm extra (1 bytes) = 12
+            Buffer.BlockCopy(StreamId, 0, tag, 12, 3); // tm (3 bytes) = 15    
             return tag;
         }
     };
@@ -51,6 +51,9 @@ namespace FlvStream2File
         public byte[] Header            = new byte[HEADER_SIZE];
         public Tag Tag = new Tag();
         public IDictionary<string, object> Meta = new Dictionary<string,object>();
+        internal IList<string> DebugOrder = null;
+        
+        
 
         public byte[] GetBytes()
         {
@@ -62,8 +65,12 @@ namespace FlvStream2File
                 {   // assure that we add space for the duration key
                     this.Meta["duration"] = 0.0;    // place holder..  
                 }
+                if (!this.Meta.ContainsKey("lasttimestamp"))
+                {   // assure that we add space for the lasttimestamp
+                    this.Meta["lasttimestamp"] = 0.0;    // place holder..  
+                }       
 
-                byte[] meta = new AmfEncoderDecoder().EncodeMetaData(this.Meta);
+                byte[] meta = new AmfEncoderDecoder().EncodeMetaData(this.Meta, this.DebugOrder);
                 Tag.TagSize = meta.Length;
                 
                 byte[] metahead = Tag.GetBytes();

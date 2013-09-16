@@ -24,9 +24,12 @@ namespace FlvStream2File
         private int _readHead = 0;
 
         private IList<IDictionary<string, object>> _obj = new List<IDictionary<string, object>>();
-        
+        public IList<string> DebugOrder { get; private set; }
+
+
         public AmfEncoderDecoder()
         {
+            DebugOrder = new List<string>();
         }
 
         private string DecodeKey(byte[] buff)
@@ -120,7 +123,7 @@ namespace FlvStream2File
 
         }
 
-        public byte[] EncodeMetaData(IDictionary<string, object> meta)
+        public byte[] EncodeMetaData(IDictionary<string, object> meta, IList<string> order = null)
         {
             using (MemoryStream ms = new MemoryStream())
             {
@@ -135,17 +138,36 @@ namespace FlvStream2File
                 byte[] asize = BitConverter.GetBytes(meta.Keys.Count);
                 Array.Reverse(asize);
                 ms.Write(asize, 0, asize.Length);    // add the array length
-                foreach (string key in meta.Keys)
-                {   // encode all the key val pairs...
-                    object val = meta[key];
-                    if (!string.IsNullOrWhiteSpace(key) && val != null)
-                    {                        
-                        byte[] keyBytes = EncodeKey(key);
-                        ms.Write(keyBytes, 0, keyBytes.Length);
-                        byte[] valBytes = EncodeVal(val);
-                        ms.Write(valBytes, 0, valBytes.Length);
+                if (order != null)
+                {
+                    foreach (string key in order)
+                    {
+                        object val = meta[key];
+                        if (!string.IsNullOrWhiteSpace(key) && val != null)
+                        {
+                            byte[] keyBytes = EncodeKey(key);
+                            ms.Write(keyBytes, 0, keyBytes.Length);
+                            byte[] valBytes = EncodeVal(val);
+                            ms.Write(valBytes, 0, valBytes.Length);
+                        }
                     }
                 }
+                else
+                {
+                    foreach (string key in meta.Keys)
+                    {   // encode all the key val pairs...
+                        object val = meta[key];
+                        if (!string.IsNullOrWhiteSpace(key) && val != null)
+                        {                            
+                            byte[] keyBytes = EncodeKey(key);
+                            ms.Write(keyBytes, 0, keyBytes.Length);
+                            byte[] valBytes = EncodeVal(val);
+                            ms.Write(valBytes, 0, valBytes.Length);
+                        }
+                    }
+                }
+                ms.WriteByte((byte)0x0);    // Not totally sure why i need this...
+                ms.WriteByte((byte)0x0);    // Not totally sure why i need this...
                 ms.WriteByte((byte)AMFTypes.End);    // End of array..
                 return ms.GetBuffer().Take((int)ms.Length).ToArray();
             }
@@ -167,11 +189,12 @@ namespace FlvStream2File
             Debug.Write(string.Format("onMetaData Array Len: {0}\n", arrayLen));           
             while (_readHead <= buff.Length-1)  
             {
-                string key = DecodeKey(buff);               
+                string key = DecodeKey(buff);
+                DebugOrder.Add(key);
                 object val = DecodeVal(buff);
-                Debug.Write(string.Format("Encode key {0} => {1}\n", key,val));
+                Debug.Write(string.Format("Encode key {0} => {1}\n", key,val));                
                 //keyval.Add(new KeyValuePair<string, object>(key, val));  // Have some files with duplicate keys in Meta..
-                keyval[key] = val;
+                keyval[key] = val;                
             }
 
             return keyval;

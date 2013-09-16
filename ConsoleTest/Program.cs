@@ -71,6 +71,11 @@ namespace ConsoleTest
             finally
             {   // 
                 stream2File.FinallizeFile();
+
+                Console.WriteLine("");
+                Console.WriteLine(string.Format( "Duraction: {0}s", stream2File.MaxTimeStamp/1000.0));
+                Console.WriteLine(string.Format("Num Audio: {0}", stream2File.NumAudio));
+                Console.WriteLine(string.Format("Num Video: {0}", stream2File.NumVideo));
             }
         }
     }

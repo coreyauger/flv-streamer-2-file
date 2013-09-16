@@ -13,8 +13,7 @@ namespace FlvStream2File
         public string FileName { get; private set; }
 
         private int _readPos = 0;
-        private int _restOfTag = 0;
-
+        
         private bool hasHeader = false;
         const int BUF_LEN = 2048;        // NOTE: this MUST be large enough to get header + meta data...
         private MemoryStream _ms = new MemoryStream(BUF_LEN);
@@ -22,13 +21,11 @@ namespace FlvStream2File
         public int NumVideo { get; private set; }
         public int NumAudio { get; private set; }
         public int MaxTimeStamp { get; private set; }
+        internal int BaseTimeStamp = 0;
 
         private FlvHeader _header = new FlvHeader();
         private Tag _curTag = new Tag();
 
-        internal byte[] _prevSize = new byte[sizeof(int)];
-
-        
 
         public FlvStream2FileWriter(string filename)
         {
@@ -111,7 +108,7 @@ namespace FlvStream2File
                 Write(buffer.Skip(toRead).ToArray());
             }
         }
-
+        
         private void ParseTag(byte[] buffer)
         {
             _ms.Write(buffer, 0, buffer.Length);
@@ -123,20 +120,7 @@ namespace FlvStream2File
                 Array.Reverse(_curTag.PrevSize);
                 Debug.Write(string.Format("Prev Tag Len: {0}\n", BitConverter.ToInt32( _curTag.PrevSize, 0)-11 ));
                 _curTag.TagType = (byte)_ms.ReadByte();  
-                Debug.Write(string.Format("Tag Type: {0}\n", _curTag.TagType));
-                if (_curTag.TagType == (byte)TagType.AUDIO)
-                {
-                    this.NumAudio++;
-                }
-                else if (_curTag.TagType == (byte)TagType.VIDEO)
-                {
-                    this.NumVideo++;
-                }
-                else
-                {
-                    Debug.Write("Unknown Tag Type (something is wrong)");
-                    throw new Exception("Unknown Tag");     // TODO: throw discontinuity exception...
-                }
+                Debug.Write(string.Format("Tag Type: {0}\n", _curTag.TagType));                
                 
                 byte[] tagSize = new byte[sizeof(int)];
                 _ms.Read(tagSize, 1, 3);     // read 24 bit body length.  Note: Body length + 11 is the entire TAG size	
@@ -151,6 +135,9 @@ namespace FlvStream2File
                 Array.Reverse(tagMs);
                 _curTag.TimeStamp = BitConverter.ToInt32(tagMs, 0);
                 Debug.Write(string.Format("{0} ms\n", _curTag.TimeStamp));
+               
+                _curTag.TimeStamp -= this.BaseTimeStamp;        // reset by the offset that we caught this file
+                
                 this.MaxTimeStamp = Math.Max(this.MaxTimeStamp, _curTag.TimeStamp);
 
                 _curTag.TimeExtra = (byte)_ms.ReadByte();
@@ -158,6 +145,28 @@ namespace FlvStream2File
                 _ms.Read(_curTag.StreamId, 0, _curTag.StreamId.Length);
                 byte[] rest = _ms.GetBuffer().Skip((int)_ms.Position).Take((int)(dataLen - _ms.Position)).ToArray();
                 _ms.Position = 0;
+
+
+                if (_curTag.TagType == (byte)TagType.AUDIO)
+                {
+                    this.NumAudio++;
+                    if (this.NumAudio == 2)
+                    {   // after the AAC header with a ts of 0 .. lets check how far out we are..
+                        Debug.Write(string.Format("Reseting to this base timestamp {0} ms\n", _curTag.TimeStamp));
+                        this.BaseTimeStamp = _curTag.TimeStamp;
+                        _curTag.TimeStamp = 0;
+                    }
+              
+                }
+                else if (_curTag.TagType == (byte)TagType.VIDEO)
+                {
+                    this.NumVideo++;                   
+                }
+                else
+                {
+                    Debug.Write("Unknown Tag Type (something is wrong)");
+                    throw new Exception("Unknown Tag");     // TODO: throw discontinuity exception...
+                }
 
                 byte[] tagHead = _curTag.GetBytes();
                 _fs.Write(tagHead, 0, tagHead.Length);
@@ -196,8 +205,10 @@ namespace FlvStream2File
                 _ms.Read(_header.Tag.StreamId, 0, _header.Tag.StreamId.Length);
                 _header.Tag.Data = new byte[_header.Tag.TagSize];
                 _ms.Read(_header.Tag.Data, 0, _header.Tag.Data.Length);
-
-                _header.Meta = new AmfEncoderDecoder().DecodeMetaData(_header.Tag.Data);
+                
+                AmfEncoderDecoder amf =new AmfEncoderDecoder();
+                _header.Meta = amf.DecodeMetaData(_header.Tag.Data);
+                _header.DebugOrder = amf.DebugOrder;
 
                 byte[] header =_header.GetBytes();
                 _fs.Write(header, 0, header.Length);
@@ -216,11 +227,14 @@ namespace FlvStream2File
         {
             _fs.Dispose();
             _ms.Dispose();
+            _fs = null;
+            _ms = null;
 
             // do meta data correction and overwrite ...
             using (FileStream fs = new FileStream(this.FileName, FileMode.Open))
             {
-                _header.Meta["duration"] = this.MaxTimeStamp / 1000.0; // duration is in seconds..
+                _header.Meta["duration"] = (double)this.MaxTimeStamp / 1000.0; // duration is in seconds..
+                _header.Meta["lasttimestamp"] = (double)this.MaxTimeStamp; // duration is in seconds..
                 byte[] header = _header.GetBytes();
                 fs.Write(header, 0, header.Length);
             }
