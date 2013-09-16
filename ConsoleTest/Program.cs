@@ -13,8 +13,13 @@ namespace ConsoleTest
         
         static void Main(string[] args)
         {
+            if (args.Length != 2)
+            {
+                Console.WriteLine("Usage:\nConsoleTest.exe \"infile.flv\" \"outfile.flv\"");
+                return;
+            }
             // We just test from a file source 
-            FlvStream2FileWriter stream2File = new FlvStream2FileWriter("C:\\tmp\\out.flv");
+            FlvStream2FileWriter stream2File = new FlvStream2FileWriter(args[1]);
             try
             {
                 FileStream fs = new FileStream(args[0], FileMode.Open);
@@ -28,13 +33,23 @@ namespace ConsoleTest
                         // Call EndRead.
                         int bytesRead = fs.EndRead(ar);
 
-                        // Process the bytes here.                    
-                        stream2File.Write(buffer);
-                        if (bytesRead < BUF_LEN)
+                        // Process the bytes here.
+                        if (bytesRead != buffer.Length)
                         {
-                            Console.Write("Last read??");
+                            if (bytesRead == 0)
+                            {
+                                fs.Dispose();
+                                fs = null;
+                                return;
+                            }
+                            stream2File.Write(buffer.Take(bytesRead).ToArray());
+                        }
+                        else
+                        {
+                            stream2File.Write(buffer);
                         }
                         fs.BeginRead(buffer, 0, BUF_LEN, callback, null);
+                        Console.Write(".");
                     }
                     catch (Exception e)
                     {   // just close and return for now on error...
@@ -46,7 +61,7 @@ namespace ConsoleTest
                 fs.BeginRead(buffer, 0, BUF_LEN, callback, null);
                 while (fs != null)
                 {   // this could be better ;)
-                    System.Threading.Thread.Sleep(250);
+                    System.Threading.Thread.Sleep(125);
                 }
             }
             catch (Exception ex)
