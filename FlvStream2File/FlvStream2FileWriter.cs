@@ -15,6 +15,7 @@ namespace FlvStream2File
         private int _readPos = 0;
         
         private bool hasHeader = false;
+        private bool hasOffset = false;
         const int BUF_LEN = 2048;        // NOTE: this MUST be large enough to get header + meta data...
         private MemoryStream _ms = new MemoryStream(BUF_LEN);
 
@@ -134,7 +135,7 @@ namespace FlvStream2File
                 tagMs[0] = 0;
                 Array.Reverse(tagMs);
                 _curTag.TimeStamp = BitConverter.ToInt32(tagMs, 0);
-                Debug.Write(string.Format("{0} ms\n", _curTag.TimeStamp));
+                Debug.Write(string.Format("Origin {0} ms\n", _curTag.TimeStamp));
                
                 _curTag.TimeStamp -= this.BaseTimeStamp;        // reset by the offset that we caught this file
                 
@@ -150,17 +151,27 @@ namespace FlvStream2File
                 if (_curTag.TagType == (byte)TagType.AUDIO)
                 {
                     this.NumAudio++;
-                    if (this.NumAudio == 2)
+                    if (!hasOffset && this.NumAudio == 2)
                     {   // after the AAC header with a ts of 0 .. lets check how far out we are..
+                        hasOffset = true;
                         Debug.Write(string.Format("Reseting to this base timestamp {0} ms\n", _curTag.TimeStamp));
                         this.BaseTimeStamp = _curTag.TimeStamp;
                         _curTag.TimeStamp = 0;
+                        this.MaxTimeStamp = 0;
                     }
               
                 }
                 else if (_curTag.TagType == (byte)TagType.VIDEO)
                 {
                     this.NumVideo++;                   
+                    if(!hasOffset && this.NumVideo == 2)
+                    {   // sometimes video tags come before audio tags
+                        hasOffset = true;
+                        Debug.Write(string.Format("Reseting to this base timestamp {0} ms\n", _curTag.TimeStamp));
+                        this.BaseTimeStamp = _curTag.TimeStamp;
+                        _curTag.TimeStamp = 0;
+                        this.MaxTimeStamp = 0;
+                    }
                 }
                 else
                 {
@@ -169,6 +180,7 @@ namespace FlvStream2File
                 }
 
                 byte[] tagHead = _curTag.GetBytes();
+                Debug.Write(string.Format("Writing {0} ms\n", _curTag.TimeStamp));
                 _fs.Write(tagHead, 0, tagHead.Length);
 
                 Write(rest);
