@@ -181,13 +181,25 @@ namespace FlvStream2File
             string onMeta = DecodeVal(buff) as string;
             // read array type
             byte type = buff[_readHead++];
-            Debug.Assert(type == (byte)AMFTypes.Array);
-            byte[] alen = new byte[sizeof(int)];
-            Buffer.BlockCopy(buff, _readHead, alen, 0, alen.Length);
-            _readHead += alen.Length;
-            int arrayLen = BitConverter.ToInt32(alen.Reverse().ToArray(), 0);
-            Debug.Write(string.Format("onMetaData Array Len: {0}\n", arrayLen));           
-            while (_readHead <= buff.Length-1)  
+            Debug.Assert(type == (byte)AMFTypes.Array || type == (byte)AMFTypes.Object);
+            if(type == (byte)AMFTypes.Array)
+            {
+                byte[] alen = new byte[sizeof(int)];
+                Buffer.BlockCopy(buff, _readHead, alen, 0, alen.Length);
+                _readHead += alen.Length;
+                int arrayLen = BitConverter.ToInt32(alen.Reverse().ToArray(), 0);
+                Debug.Write(string.Format("onMetaData Array Len: {0}\n", arrayLen));
+            }
+            else if(type == (byte)AMFTypes.Object)
+            {
+                // Do nothing. Just fine.
+                Debug.Write("onMetaData isn't an Array but Object!\n");
+            }
+            else
+            {
+                //TODO: Maybe throw a exception
+            }
+            while(_readHead <= buff.Length - 1)
             {
                 string key = DecodeKey(buff);
                 DebugOrder.Add(key);
